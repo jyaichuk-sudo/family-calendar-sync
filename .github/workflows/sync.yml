@@ -1,4 +1,4 @@
-Hourly Calendar Sync
+name: Hourly Calendar Sync
 on:
   schedule:
     - cron: '0 * * * *'
