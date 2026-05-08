@@ -24,8 +24,6 @@ jobs:
         run: pip install requests icalendar
         
       - name: Run sync
-        env:
-          CALENDAR_LINKS: ${{ secrets.CALENDAR_LINKS }}
         run: python calendar_sync.py
         
       - name: Upload artifact
