@@ -1,45 +1,36 @@
 name: Hourly Calendar Sync
+
 on:
   schedule:
     - cron: '0 * * * *'
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
+    # This explicitly gives the action permission to write to your files
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
-      
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-          
+
       - name: Install dependencies
         run: pip install requests icalendar
-        
-      - name: Run sync
-        run: python calendar_sync.py
-        
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          # This uploads the whole folder so our .ics file is included
-          path: '.'
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-        
+      - name: Run sync script
+        run: python calendar_sync.py
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          # -f forces the file to be tracked even if it was ignored before
+          git add -f family_master.ics
+          git commit -m "Automated Calendar Update" || echo "No changes to commit"
+          git push origin main
