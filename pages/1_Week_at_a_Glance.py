@@ -2,47 +2,39 @@ import streamlit as st
 import requests
 from icalendar import Calendar
 from datetime import datetime, timedelta, date
+from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut
 
 st.set_page_config(page_title="Week at a Glance", page_icon="🗓️", layout="wide")
 
-# --- CSS FOR UI TUNING ---
-st.markdown("""
-    <style>
-    [data-testid="stHorizontalBlock"]:first-of-type {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        overflow-x: auto !important;
-    }
-    [data-testid="stHorizontalBlock"]:first-of-type > div {
-        min-width: 100px !important; 
-    }
-    .emoji-row {
-        font-size: 1.2rem;
-        margin-top: -5px;
-        margin-bottom: 5px;
-        min-height: 1.5rem;
-    }
-    .weather-sub {
-        font-size: 0.8rem;
-        font-weight: bold;
-        color: #555;
-    }
-    .location-text {
-        font-size: 0.85rem;
-        color: #666;
-        margin-top: 2px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
 # --- CONFIG ---
 ICS_URL = "https://jyaichuk-sudo.github.io/family-calendar-sync/family_master.ics"
-LAT = "42.1034"
-LON = "-76.2624"
+HOME_LAT, HOME_LON = 42.1034, -76.2624  # Owego, NY
+LAT, LON = "42.1034", "-76.2624"
 
-st.title("🗓️ Family Week at a Glance")
+# --- HELPERS ---
+geolocator = Nominatim(user_agent="family_dashboard_jyaichuk")
 
+@st.cache_data(ttl=86400) # Cache coordinates for 24 hours
+def get_coords(address):
+    if not address or len(address) < 5: return None
+    try:
+        location = geolocator.geocode(address)
+        if location: return (location.latitude, location.longitude)
+    except: return None
+    return None
+
+@st.cache_data(ttl=3600) # Cache drive time for 1 hour
+def get_drive_time(dest_coords):
+    if not dest_coords: return None
+    try:
+        url = f"http://router.project-osrm.org/route/v1/driving/{HOME_LON},{HOME_LAT};{dest_coords[1]},{dest_coords[0]}?overview=false"
+        res = requests.get(url).json()
+        # Duration is in seconds, convert to minutes
+        return round(res['routes'][0]['duration'] / 60)
+    except: return None
+
+# ... (keep get_weather() exactly as it was) ...
 @st.cache_data(ttl=3600)
 def get_weather():
     try:
@@ -51,8 +43,7 @@ def get_weather():
         data = {}
         for p in f_res['properties']['periods']:
             d = p['startTime'][:10]
-            if d not in data: 
-                data[d] = {"high": "--", "low": "--", "precip": 0, "icon": "☀️", "full_desc": ""}
+            if d not in data: data[d] = {"high": "--", "low": "--", "precip": 0, "icon": "☀️", "full_desc": ""}
             if p['isDaytime']:
                 data[d]['high'] = f"{p['temperature']}°"
                 data[d]['full_desc'] = p['shortForecast']
@@ -64,8 +55,7 @@ def get_weather():
                 elif 'rain' in desc or 'showers' in desc: data[d]['icon'] = "💧"
                 elif 'cloud' in desc: data[d]['icon'] = "☁️"
                 else: data[d]['icon'] = "☀️"
-            else:
-                data[d]['low'] = f"{p['temperature']}°"
+            else: data[d]['low'] = f"{p['temperature']}°"
         return data
     except: return None
 
@@ -84,17 +74,27 @@ def main():
             d = start.date() if isinstance(start, datetime) else start
             if d in daily_events:
                 summary = str(ev.get('summary'))
-                # Pull location if it exists
-                location = str(ev.get('location', ''))
+                loc = str(ev.get('location', ''))
                 emoji = summary[-1] if len(summary) > 0 else "📅"
+                
+                # Logic for Drive Time
+                drive_min = None
+                leave_time = None
+                if loc and len(loc) > 5 and isinstance(start, datetime):
+                    coords = get_coords(loc)
+                    drive_min = get_drive_time(coords)
+                    if drive_min:
+                        # Calculate Leave Time (Event time minus drive time minus 5 min buffer)
+                        leave_dt = start - timedelta(minutes=drive_min + 5)
+                        leave_time = leave_dt.strftime("%-I:%M %p")
+
                 daily_events[d].append({
-                    "summary": summary, 
-                    "emoji": emoji, 
-                    "location": location,
-                    "time": start.strftime("%-I:%M %p") if isinstance(start, datetime) else "All Day"
+                    "summary": summary, "emoji": emoji, "location": loc,
+                    "time": start.strftime("%-I:%M %p") if isinstance(start, datetime) else "All Day",
+                    "drive": drive_min, "leave": leave_time, "is_timed": isinstance(start, datetime)
                 })
 
-    # --- 1. WEEKLY SUMMARY ---
+    # --- TOP SUMMARY (Keep existing code) ---
     st.subheader("Weekly Summary")
     summary_cols = st.columns(7)
     for i, d in enumerate(days):
@@ -104,14 +104,14 @@ def main():
             emojis = "".join(list(dict.fromkeys([e['emoji'] for e in daily_events[d]])))
             with st.container(border=True):
                 st.markdown(f"**{d.strftime('%a')}**")
-                st.markdown(f'<p class="emoji-row">{emojis if emojis else "✨"}</p>', unsafe_allow_html=True)
+                st.markdown(f'<p style="font-size:1.2rem; margin-bottom:5px;">{emojis if emojis else "✨"}</p>', unsafe_allow_html=True)
                 st.markdown(f"**{w['high']}** / {w['low']}")
-                precip_text = f" {w['precip']}%" if w['precip'] > 0 else ""
-                st.markdown(f'<p class="weather-sub">{w["icon"]}{precip_text}</p>', unsafe_allow_html=True)
+                prec_txt = f" {w['precip']}%" if w['precip'] > 0 else ""
+                st.markdown(f'<p style="font-size:0.8rem; font-weight:bold;">{w["icon"]}{prec_txt}</p>', unsafe_allow_html=True)
 
     st.divider()
 
-    # --- 2. DETAILED VIEW ---
+    # --- DETAILED VIEW (Drive Time Added Here) ---
     st.subheader("Daily Details")
     for d in days:
         with st.container():
@@ -121,20 +121,22 @@ def main():
                 st.caption(d.strftime('%b %d'))
             with col_b:
                 events = sorted(daily_events[d], key=lambda x: (x['time'] != "All Day", x['time']))
-                if not events:
-                    st.write("✨ *No scheduled events*")
+                if not events: st.write("✨ *No scheduled events*")
                 else:
                     for ev in events:
                         with st.container(border=True):
                             st.markdown(f"**{ev['time']}** — {ev['summary']}")
-                            # Display location if available
-                            if ev['location'] and ev['location'].strip():
-                                st.markdown(f'<p class="location-text">📍 {ev["location"]}</p>', unsafe_allow_html=True)
+                            if ev['location']:
+                                st.markdown(f'<p style="font-size:0.85rem; color:#666;">📍 {ev["location"]}</p>', unsafe_allow_html=True)
+                            
+                            # DRIVE TIME ALERT
+                            if ev['drive'] and ev['is_timed']:
+                                st.info(f"🚗 **{ev['drive']} min drive.** Leave by **{ev['leave']}** to be early.")
                 
                 d_key = d.strftime('%Y-%m-%d')
                 if weather and d_key in weather:
                     w = weather[d_key]
-                    st.caption(f"🌤️ {w['icon']} {w.get('full_desc', 'Forecast active')}")
+                    st.caption(f"🌤️ {w['icon']} {w.get('full_desc', '')}")
             st.divider()
 
 if __name__ == "__main__":
