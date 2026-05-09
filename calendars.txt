@@ -1,4 +1,4 @@
 Baseball|⚾:https://www.schedulegalaxy.com/schools/158/teams/18023547/schedule/ical.ics?game_types%5B%5D=scrimmage&game_types%5B%5D=regular_season&year=2025
 Football|🏈:https://www.schedulegalaxy.com/schools/158/ical.ics?game_types%5B%5D=regular_season&game_types%5B%5D=post_season&game_types%5B%5D=event&game_types%5B%5D=non_district&game_types%5B%5D=district&level_ids%5B%5D=1&sport_ids%5B%5D=49&t=1778267788&type=all&year=2025
-Soccer|⚽:https://calendar.google.com/calendar/u/0/embed?src=e8af711ced169168a871d0d336d7982d3c424e6cb0148ea519fa73f1a01c6e71@group.calendar.google.com&ctz=America/New_York
+Soccer|⚽:https://calendar.google.com/calendar/ical/e8af711ced169168a871d0d336d7982d3c424e6cb0148ea519fa73f1a01c6e71%40group.calendar.google.com/private-d09c8c4f9811a3f511c714b71c7670c4/basic.ics
 Other|📅:https://calendar.google.com/calendar/ical/304f6527b21c53ba826feaf19cf7f1cf990205e7ba54354bd4353653b336c5d2%40group.calendar.google.com/private-e77ceb059018df3be31d9bd6d8f22668/basic.ics
