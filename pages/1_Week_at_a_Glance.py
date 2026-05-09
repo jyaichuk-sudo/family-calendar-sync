@@ -5,9 +5,10 @@ from datetime import datetime, timedelta, date
 
 st.set_page_config(page_title="Week at a Glance", page_icon="🗓️", layout="wide")
 
-# --- CSS FOR COMPACT SUMMARY ---
+# --- CSS FOR UI TUNING ---
 st.markdown("""
     <style>
+    /* Force the FIRST set of columns (Summary) to stay horizontal */
     [data-testid="stHorizontalBlock"]:first-of-type {
         display: flex !important;
         flex-direction: row !important;
@@ -47,10 +48,11 @@ def get_weather():
         for p in f_res['properties']['periods']:
             d = p['startTime'][:10]
             if d not in data: 
-                data[d] = {"high": "--", "low": "--", "precip": 0, "icon": "☀️"}
+                data[d] = {"high": "--", "low": "--", "precip": 0, "icon": "☀️", "full_desc": ""}
             
             if p['isDaytime']:
                 data[d]['high'] = f"{p['temperature']}°"
+                data[d]['full_desc'] = p['shortForecast']
                 prob = p.get('probabilityOfPrecipitation', {}).get('value', 0)
                 data[d]['precip'] = prob if prob else 0
                 
@@ -80,51 +82,60 @@ def main():
             d = start.date() if isinstance(start, datetime) else start
             if d in daily_events:
                 summary = str(ev.get('summary'))
-                # Pull the emoji from the end of the summary
                 emoji = summary[-1] if len(summary) > 0 else "📅"
-                daily_events[d].append({"summary": summary, "emoji": emoji, "time": start.strftime("%-I:%M %p") if isinstance(start, datetime) else "All Day"})
+                daily_events[d].append({
+                    "summary": summary, 
+                    "emoji": emoji, 
+                    "time": start.strftime("%-I:%M %p") if isinstance(start, datetime) else "All Day"
+                })
 
-    # --- TOP SUMMARY SECTION ---
+    # --- 1. WEEKLY SUMMARY (Horizontal/Non-Responsive) ---
     st.subheader("Weekly Summary")
     summary_cols = st.columns(7)
     for i, d in enumerate(days):
         with summary_cols[i]:
             d_key = d.strftime('%Y-%m-%d')
             w = weather.get(d_key, {"high": "--", "low": "--", "precip": 0, "icon": "☀️"})
-            
-            # Extract unique emojis
             emojis = "".join(list(dict.fromkeys([e['emoji'] for e in daily_events[d]])))
             
             with st.container(border=True):
                 st.markdown(f"**{d.strftime('%a')}**")
-                # Emojis on their own line with custom CSS class
                 st.markdown(f'<p class="emoji-row">{emojis if emojis else "✨"}</p>', unsafe_allow_html=True)
                 st.markdown(f"**{w['high']}** / {w['low']}")
-                
                 precip_text = f" {w['precip']}%" if w['precip'] > 0 else ""
                 st.markdown(f'<p class="weather-sub">{w["icon"]}{precip_text}</p>', unsafe_allow_html=True)
 
     st.divider()
 
-    # --- DETAILED VIEW SECTION ---
-    detail_cols = st.columns(7)
-    for i, d in enumerate(days):
-        with detail_cols[i]:
-            st.markdown(f"### {d.strftime('%a')}")
-            st.caption(d.strftime('%b %d'))
+    # --- 2. DETAILED VIEW (Responsive/Vertical on Mobile) ---
+    st.subheader("Daily Details")
+    
+    # We use a loop WITHOUT st.columns here to allow natural stacking
+    for d in days:
+        with st.container():
+            # Day Header
+            col_a, col_b = st.columns([1, 4])
+            with col_a:
+                st.markdown(f"### {d.strftime('%a')}")
+                st.caption(d.strftime('%b %d'))
             
-            for ev in sorted(daily_events[d], key=lambda x: (x['time'] != "All Day", x['time'])):
-                with st.container(border=True):
-                    st.markdown(f"**{ev['time']}**")
-                    st.markdown(f"{ev['summary']}")
-
-            st.write("") 
-            d_key = d.strftime('%Y-%m-%d')
-            if weather and d_key in weather:
-                w = weather[d_key]
-                with st.expander("🌤️ Details", expanded=False):
-                    st.write(f"**{w['high']}** / {w['low']}")
-                    st.caption(f"{w['icon']} Forecast active")
+            with col_b:
+                # Events for the day
+                events = sorted(daily_events[d], key=lambda x: (x['time'] != "All Day", x['time']))
+                if not events:
+                    st.write("✨ *No scheduled events*")
+                else:
+                    for ev in events:
+                        with st.container(border=True):
+                            st.markdown(f"**{ev['time']}** — {ev['summary']}")
+                
+                # Weather detail at bottom of day
+                d_key = d.strftime('%Y-%m-%d')
+                if weather and d_key in weather:
+                    w = weather[d_key]
+                    st.caption(f"🌤️ {w['icon']} {w.get('full_desc', 'Forecast active')}")
+            
+            st.divider()
 
 if __name__ == "__main__":
     main()
