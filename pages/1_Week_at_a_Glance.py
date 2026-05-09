@@ -23,8 +23,15 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- CONFIG ---
-ICS_URL = "https://jyaichuk-sudo.github.io/family-calendar-sync/family_master.ics"
-CD_URL = "https://jyaichuk-sudo.github.io/family-calendar-sync/countdowns.txt"
+USERNAME = "jyaichuk-sudo"
+REPO = "family-calendar-sync"
+
+# Points to Raw GitHub (Instant) rather than GitHub Pages (Delayed)
+RAW_BASE = f"https://raw.githubusercontent.com/{USERNAME}/{REPO}/main"
+
+ICS_URL = f"{RAW_BASE}/family_master.ics"
+CD_URL = f"{RAW_BASE}/countdowns.txt"
+
 LAT, LON = "42.1034", "-76.2624"
 
 # (Keep your existing get_weather() and get_calendar_events() functions)
