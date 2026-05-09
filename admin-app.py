@@ -1,18 +1,15 @@
 import streamlit as st
 from github import Github
 
-# --- APP SETUP ---
 st.set_page_config(page_title="Family Calendar Admin", page_icon="📅", layout="wide")
 st.title("📅 Calendar Sync Admin")
 
-# Pulling credentials
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 REPO_NAME = st.secrets["REPO_NAME"]
 
 g = Github(GITHUB_TOKEN)
 repo = g.get_repo(REPO_NAME)
 
-# --- LOAD DATA ---
 if 'cal_list' not in st.session_state:
     contents = repo.get_contents("calendars.txt")
     st.session_state.file_sha = contents.sha
@@ -21,65 +18,51 @@ if 'cal_list' not in st.session_state:
     st.session_state.cal_list = []
     for line in lines:
         if ':' in line:
-            name, url = line.split(':', 1)
-            st.session_state.cal_list.append({"name": name.strip(), "url": url.strip()})
+            # Format is Name|Emoji:URL
+            parts = line.split(':', 1)
+            meta, url = parts[0], parts[1]
+            if '|' in meta:
+                name, emoji = meta.split('|', 1)
+            else:
+                name, emoji = meta, "📅"
+            st.session_state.cal_list.append({"name": name.strip(), "emoji": emoji.strip(), "url": url.strip()})
 
-# Tracking if any name is invalid
 any_errors = False
 
-# --- UI: MANAGE EXISTING ---
 st.subheader("Current Calendars")
 for i, cal in enumerate(st.session_state.cal_list):
-    col1, col2, col3 = st.columns([1, 3, 0.5])
+    col1, col2, col3, col4 = st.columns([1, 0.5, 3, 0.5])
     with col1:
-        name_val = st.text_input(f"Name {i}", value=cal['name'], key=f"name_{i}", label_visibility="collapsed")
-        if ":" in name_val:
-            st.error("No colons (:) allowed in names")
+        name_val = st.text_input(f"Name {i}", value=cal['name'], key=f"n_{i}", label_visibility="collapsed")
+        if ":" in name_val or "|" in name_val:
+            st.error("No : or | allowed")
             any_errors = True
-        st.session_state.cal_list[i]['name'] = name_val
     with col2:
-        st.session_state.cal_list[i]['url'] = st.text_input(f"URL {i}", value=cal['url'], key=f"url_{i}", label_visibility="collapsed")
+        emoji_val = st.text_input(f"Emoji {i}", value=cal['emoji'], key=f"e_{i}", label_visibility="collapsed")
     with col3:
-        if st.button("🗑️", key=f"btn_del_{i}"):
+        url_val = st.text_input(f"URL {i}", value=cal['url'], key=f"u_{i}", label_visibility="collapsed")
+    with col4:
+        if st.button("🗑️", key=f"d_{i}"):
             st.session_state.cal_list.pop(i)
             st.rerun()
+    st.session_state.cal_list[i] = {"name": name_val, "emoji": emoji_val, "url": url_val}
 
 st.divider()
-
-# --- UI: ADD NEW ---
-st.subheader("Add New Calendar")
-new_col1, new_col2, new_col3 = st.columns([1, 3, 1])
-with new_col1:
-    new_name = st.text_input("New Name", key="new_name_input", placeholder="e.g. Baseball")
-    if ":" in new_name:
-        st.error("Remove the colon")
-        any_errors = True
-with new_col2:
-    new_url = st.text_input("New URL", key="new_url_input", placeholder="https://...")
-with new_col3:
-    # Disable "Add" button if there's a colon in the new name
-    add_disabled = True if ":" in new_name or not new_name or not new_url else False
-    if st.button("➕ Add Entry", disabled=add_disabled):
-        st.session_state.cal_list.append({"name": new_name, "url": new_url})
+st.subheader("Add New")
+n_col1, n_col2, n_col3, n_col4 = st.columns([1, 0.5, 3, 1])
+with n_col1: new_name = st.text_input("New Name", key="new_n")
+with n_col2: new_emoji = st.text_input("Emoji", value="📅", key="new_e")
+with n_col3: new_url = st.text_input("New URL", key="new_u")
+with n_col4:
+    if st.button("➕ Add") and new_name and new_url:
+        st.session_state.cal_list.append({"name": new_name, "emoji": new_emoji, "url": new_url})
         st.rerun()
 
-st.divider()
-
-# --- SAVE TO GITHUB ---
-# Disable "Save" button if ANY entry has a colon
-if st.button("💾 Save All Changes to GitHub", type="primary", disabled=any_errors):
-    final_text = "\n".join([f"{c['name']}:{c['url']}" for c in st.session_state.cal_list])
-    try:
-        repo.update_file(
-            "calendars.txt", 
-            "Admin UI Update - Added Colon Validation", 
-            final_text, 
-            st.session_state.file_sha
-        )
-        st.success("✅ Changes pushed! Syncing now...")
-        del st.session_state.cal_list
-        st.rerun()
-    except Exception as e:
-        st.error(f"❌ GitHub Error: {e}")
-elif any_errors:
-    st.warning("Please remove all colons from names before saving.")
+if st.button("💾 Save All Changes", type="primary", disabled=any_errors):
+    # Format: Name|Emoji:URL
+    final_text = "\n".join([f"{c['name']}|{c['emoji']}:{c['url']}" for c in st.session_state.cal_list])
+    repo.update_file("calendars.txt", "Update emojis", final_text, st.session_state.file_sha)
+    st.success("Saved!")
+    del st.session_state.cal_list
+    st.rerun()
+    
