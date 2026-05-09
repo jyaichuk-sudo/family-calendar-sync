@@ -78,5 +78,51 @@ def main():
             if d in daily_events:
                 summary = str(ev.get('summary'))
                 emoji = summary[-1] if len(summary) > 0 else "📅"
-                daily_events[d].append({"summary": summary, "emoji": emoji, "time": start.strftime("%-I:%M %p
+                daily_events[d].append({"summary": summary, "emoji": emoji, "time": start.strftime("%-I:%M %p") if isinstance(start, datetime) else "All Day"})
+
+    # --- TOP SUMMARY SECTION ---
+    st.subheader("Weekly Summary")
+    summary_cols = st.columns(7)
+    for i, d in enumerate(days):
+        with summary_cols[i]:
+            d_key = d.strftime('%Y-%m-%d')
+            w = weather.get(d_key, {"high": "--", "low": "--", "precip": 0, "type": ""})
+            emojis = "".join(list(set([e['emoji'] for e in daily_events[d]])))
+            
+            with st.container(border=True):
+                st.markdown(f"**{d.strftime('%a')}** {emojis if emojis else ''}")
+                st.markdown(f"**{w['high']}** / {w['low']}")
                 
+                # Precipitation Display
+                if w['precip'] > 0:
+                    st.markdown(f'<p class="precip-text">💧 {w["precip"]}% {w["type"]}</p>', unsafe_allow_html=True)
+                else:
+                    st.markdown('<p style="font-size: 0.75rem; color: gray;">☀️ Dry</p>', unsafe_allow_html=True)
+
+    st.divider()
+
+    # --- DETAILED VIEW SECTION ---
+    detail_cols = st.columns(7)
+    for i, d in enumerate(days):
+        with detail_cols[i]:
+            st.markdown(f"### {d.strftime('%a')}")
+            st.caption(d.strftime('%b %d'))
+            
+            for ev in sorted(daily_events[d], key=lambda x: (x['time'] != "All Day", x['time'])):
+                with st.container(border=True):
+                    st.markdown(f"**{ev['time']}**")
+                    st.markdown(f"{ev['summary']}")
+
+            st.write("") 
+            d_key = d.strftime('%Y-%m-%d')
+            if weather and d_key in weather:
+                w = weather[d_key]
+                with st.expander("🌤️ Forecast", expanded=False):
+                    st.write(f"**{w['high']}** / {w['low']}")
+                    st.caption(f"{w['desc']}")
+            else:
+                st.caption("Weather N/A")
+
+if __name__ == "__main__":
+    main()
+    
