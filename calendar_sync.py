@@ -1,36 +1,36 @@
-import requests
-from icalendar import Calendar
+name: Hourly Calendar Sync
 
-def merge():
-    master_cal = Calendar()
-    master_cal.add('prodid', '-//Family Sync//EN')
-    master_cal.add('version', '2.0')
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
 
-    with open("calendars.txt", "r") as f:
-        lines = f.readlines()
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Crucial: gives the worker permission to write to your repo
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-    for line in lines:
-        if ':' not in line: continue
-        meta, url = line.strip().split(':', 1)
-        name, emoji = meta.split('|', 1) if '|' in meta else (meta, "📅")
-        
-        try:
-            res = requests.get(url.replace('webcal://', 'https://'))
-            if res.status_code == 200:
-                cal = Calendar.from_ical(res.content)
-                for event in cal.walk('VEVENT'):
-                    summary = event.get('summary', 'No Title')
-                    # Tag the event with name and emoji
-                    event['summary'] = f"{summary} ({name}) {emoji}"
-                    # Ensure location is passed through
-                    # (No changes needed to the object itself, it will copy over)
-                    master_cal.add_component(event)
-        except Exception as e:
-            print(f"Error {name}: {e}")
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
-    with open("family_master.ics", "wb") as f:
-        f.write(master_cal.to_ical())
+      - name: Install dependencies
+        run: pip install requests icalendar
 
-if __name__ == "__main__":
-    merge()
-    
+      - name: Run sync script
+        run: python calendar_sync.py
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          # This forces the file to be added even if git is being finicky
+          git add -f family_master.ics 
+          # The '|| echo' prevents the action from failing if there are no changes
+          git commit -m "Automated Calendar Update" || echo "No changes to commit"
+          git push origin main
