@@ -1,3 +1,3 @@
-Baseball:https://www.schedulegalaxy.com/schools/158/teams/18023547/schedule/ical.ics?game_types%5B%5D=scrimmage&game_types%5B%5D=regular_season&year=2025
-Football:https://www.schedulegalaxy.com/schools/158/ical.ics?game_types%5B%5D=regular_season&game_types%5B%5D=post_season&game_types%5B%5D=event&game_types%5B%5D=non_district&game_types%5B%5D=district&level_ids%5B%5D=1&sport_ids%5B%5D=49&t=1778267788&type=all&year=2025
-Soccer:webcal://api.360player.com/v1/ics/events.ics?token=x5ZF7rR8pvf7GNBgx1z6KPW293aKcJx5&from=1775676551&group_ids=64149
+Baseball|⚾:https://www.schedulegalaxy.com/schools/158/teams/18023547/schedule/ical.ics?game_types%5B%5D=scrimmage&game_types%5B%5D=regular_season&year=2025
+Football|🏈:https://www.schedulegalaxy.com/schools/158/ical.ics?game_types%5B%5D=regular_season&game_types%5B%5D=post_season&game_types%5B%5D=event&game_types%5B%5D=non_district&game_types%5B%5D=district&level_ids%5B%5D=1&sport_ids%5B%5D=49&t=1778267788&type=all&year=2025
+Soccer|⚽:webcal://api.360player.com/v1/ics/events.ics?token=x5ZF7rR8pvf7GNBgx1z6KPW293aKcJx5&from=1775676551&group_ids=64149
