@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, date
 
 st.set_page_config(page_title="Week at a Glance", page_icon="🗓️", layout="wide")
 
-# --- CSS TO FORCE HORIZONTAL SUMMARY ON MOBILE ---
+# --- CSS FOR COMPACT SUMMARY ---
 st.markdown("""
     <style>
     [data-testid="stHorizontalBlock"]:first-of-type {
@@ -15,11 +15,10 @@ st.markdown("""
         overflow-x: auto !important;
     }
     [data-testid="stHorizontalBlock"]:first-of-type > div {
-        min-width: 110px !important; 
+        min-width: 100px !important; 
     }
-    .precip-text {
-        font-size: 0.75rem;
-        color: #3498db;
+    .weather-sub {
+        font-size: 0.8rem;
         font-weight: bold;
     }
     </style>
@@ -41,22 +40,20 @@ def get_weather():
         for p in f_res['properties']['periods']:
             d = p['startTime'][:10]
             if d not in data: 
-                data[d] = {"high": "--", "low": "--", "desc": "", "precip": 0, "type": ""}
+                data[d] = {"high": "--", "low": "--", "precip": 0, "icon": "☀️"}
             
             if p['isDaytime']:
                 data[d]['high'] = f"{p['temperature']}°"
-                data[d]['desc'] = p['shortForecast']
-                # Pull precipitation %
                 prob = p.get('probabilityOfPrecipitation', {}).get('value', 0)
                 data[d]['precip'] = prob if prob else 0
                 
-                # Extract simple type from description (Rain, Snow, Mix, etc)
+                # Simple Icon Mapping
                 desc = p['shortForecast'].lower()
-                if 'snow' in desc: data[d]['type'] = "Snow"
-                elif 'rain' in desc: data[d]['type'] = "Rain"
-                elif 'showers' in desc: data[d]['type'] = "Showers"
-                elif 'thunder' in desc or 't-storms' in desc: data[d]['type'] = "T-Storms"
-                elif 'ice' in desc or 'freezing' in desc: data[d]['type'] = "Ice"
+                if 'snow' in desc: data[d]['icon'] = "❄️"
+                elif 'thunder' in desc or 't-storm' in desc: data[d]['icon'] = "⚡"
+                elif 'rain' in desc or 'showers' in desc: data[d]['icon'] = "💧"
+                elif 'cloud' in desc: data[d]['icon'] = "☁️"
+                else: data[d]['icon'] = "☀️"
             else:
                 data[d]['low'] = f"{p['temperature']}°"
         return data
@@ -86,18 +83,18 @@ def main():
     for i, d in enumerate(days):
         with summary_cols[i]:
             d_key = d.strftime('%Y-%m-%d')
-            w = weather.get(d_key, {"high": "--", "low": "--", "precip": 0, "type": ""})
+            w = weather.get(d_key, {"high": "--", "low": "--", "precip": 0, "icon": "☀️"})
             emojis = "".join(list(set([e['emoji'] for e in daily_events[d]])))
             
             with st.container(border=True):
-                st.markdown(f"**{d.strftime('%a')}** {emojis if emojis else ''}")
+                st.markdown(f"**{d.strftime('%a')}** {emojis}")
                 st.markdown(f"**{w['high']}** / {w['low']}")
                 
-                # Precipitation Display
+                # Compact weather icons
                 if w['precip'] > 0:
-                    st.markdown(f'<p class="precip-text">💧 {w["precip"]}% {w["type"]}</p>', unsafe_allow_html=True)
+                    st.markdown(f'<p class="weather-sub">{w["icon"]} {w["precip"]}%</p>', unsafe_allow_html=True)
                 else:
-                    st.markdown('<p style="font-size: 0.75rem; color: gray;">☀️ Dry</p>', unsafe_allow_html=True)
+                    st.markdown(f'<p class="weather-sub">{w["icon"]}</p>', unsafe_allow_html=True)
 
     st.divider()
 
@@ -117,12 +114,9 @@ def main():
             d_key = d.strftime('%Y-%m-%d')
             if weather and d_key in weather:
                 w = weather[d_key]
-                with st.expander("🌤️ Forecast", expanded=False):
+                with st.expander("🌤️ Details", expanded=False):
                     st.write(f"**{w['high']}** / {w['low']}")
-                    st.caption(f"{w['desc']}")
-            else:
-                st.caption("Weather N/A")
+                    st.caption(p['shortForecast'] if 'p' in locals() else "Forecast available")
 
 if __name__ == "__main__":
     main()
-    
