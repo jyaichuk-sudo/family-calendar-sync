@@ -12,7 +12,6 @@ def merge():
     for line in lines:
         if ':' not in line: continue
         meta, url = line.strip().split(':', 1)
-        # Parse Name and Emoji
         name, emoji = meta.split('|', 1) if '|' in meta else (meta, "📅")
         
         try:
@@ -21,8 +20,10 @@ def merge():
                 cal = Calendar.from_ical(res.content)
                 for event in cal.walk('VEVENT'):
                     summary = event.get('summary', 'No Title')
-                    # Tag the event with the emoji for the UI to find
+                    # Tag the event with name and emoji
                     event['summary'] = f"{summary} ({name}) {emoji}"
+                    # Ensure location is passed through
+                    # (No changes needed to the object itself, it will copy over)
                     master_cal.add_component(event)
         except Exception as e:
             print(f"Error {name}: {e}")
