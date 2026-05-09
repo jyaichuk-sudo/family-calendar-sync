@@ -28,9 +28,18 @@ jobs:
 
       - name: Commit and push changes
         run: |
-          git config --global user.name "GitHub Action"
-          git config --global user.email "action@github.com"
-          # -f forces the file to be tracked even if it was ignored before
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Force add the file in case it is being ignored
           git add -f family_master.ics
-          git commit -m "Automated Calendar Update" || echo "No changes to commit"
+          
+          # Check if there are changes; if not, create a dummy change to force the build
+          if git diff --staged --quiet; then
+            echo "No changes in calendar, forcing update for deployment"
+            date > last_sync.txt
+            git add last_sync.txt
+          fi
+          
+          git commit -m "Manual Calendar Sync Update"
           git push origin main
