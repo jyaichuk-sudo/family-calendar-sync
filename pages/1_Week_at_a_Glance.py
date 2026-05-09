@@ -169,17 +169,19 @@ def main():
                     st.write("✨ *No scheduled events*")
                 else:
                     for ev in events:
-                        weather_info = ""
-                        if ev['time'] != "All Day":
-                            event_hour_key = ev['dt_obj'].strftime('%Y-%m-%d %H')
-                            if event_hour_key in weather:
-                                w = weather[event_hour_key]
-                                weather_info = f" | {w['icon']} {w['temp']}"
-                                if w['precip']:
-                                    weather_info += f" ({w['precip']} 💧)"
-
                         with st.container(border=True):
-                            st.markdown(f"**{ev['time']}** — {ev['summary']}{weather_info}")
+                            # Event Title and Time
+                            st.markdown(f"**{ev['time']}** — {ev['summary']}")
+                            
+                            # Weather Line (New Line Below)
+                            if ev['time'] != "All Day":
+                                event_hour_key = ev['dt_obj'].strftime('%Y-%m-%d %H')
+                                if event_hour_key in weather:
+                                    w = weather[event_hour_key]
+                                    precip_val = f" ({w['precip']} 💧)" if w['precip'] else ""
+                                    st.markdown(f'<p style="font-size:0.9rem; color:#444; margin-bottom:0px;">{w["icon"]} {w["temp"]} - {w["desc"]}{precip_val}</p>', unsafe_allow_html=True)
+
+                            # Location Line
                             if ev.get('location') and ev.get('location') != 'None':
                                 st.markdown(f'<p style="font-size:0.85rem; color:#666; margin-top:2px;">📍 {ev["location"]}</p>', unsafe_allow_html=True)
         st.divider()
