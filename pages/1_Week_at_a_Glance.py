@@ -5,44 +5,29 @@ from datetime import datetime, timedelta, date
 
 st.set_page_config(page_title="Week at a Glance", page_icon="🗓️", layout="wide")
 
-# --- CSS FOR UI TUNING ---
+# --- CSS TUNING ---
 st.markdown("""
     <style>
-    [data-testid="stHorizontalBlock"]:first-of-type {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        overflow-x: auto !important;
-    }
-    [data-testid="stHorizontalBlock"]:first-of-type > div {
-        min-width: 100px !important; 
-    }
-    .emoji-row {
-        font-size: 1.2rem;
-        margin-top: -5px;
-        margin-bottom: 5px;
-        min-height: 1.5rem;
-    }
-    .weather-sub {
-        font-size: 0.8rem;
-        font-weight: bold;
-        color: #555;
-    }
-    .location-text {
-        font-size: 0.85rem;
-        color: #666;
-        margin-top: 2px;
+    [data-testid="stHorizontalBlock"]:first-of-type { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important; }
+    [data-testid="stHorizontalBlock"]:first-of-type > div { min-width: 100px !important; }
+    .emoji-row { font-size: 1.2rem; margin-top: -5px; min-height: 1.5rem; }
+    .weather-sub { font-size: 0.8rem; font-weight: bold; color: #555; }
+    .countdown-card {
+        background-color: #f0f2f6;
+        padding: 10px;
+        border-radius: 10px;
+        text-align: center;
+        border-left: 5px solid #ff4b4b;
     }
     </style>
     """, unsafe_allow_html=True)
 
 # --- CONFIG ---
 ICS_URL = "https://jyaichuk-sudo.github.io/family-calendar-sync/family_master.ics"
-LAT = "42.1034"
-LON = "-76.2624"
+CD_URL = "https://jyaichuk-sudo.github.io/family-calendar-sync/countdowns.txt"
+LAT, LON = "42.1034", "-76.2624"
 
-st.title("🗓️ Family Week at a Glance")
-
+# (Keep your existing get_weather() and get_calendar_events() functions)
 @st.cache_data(ttl=3600)
 def get_weather():
     try:
@@ -51,29 +36,49 @@ def get_weather():
         data = {}
         for p in f_res['properties']['periods']:
             d = p['startTime'][:10]
-            if d not in data: 
-                data[d] = {"high": "--", "low": "--", "precip": 0, "icon": "☀️", "full_desc": ""}
+            if d not in data: data[d] = {"high": "--", "low": "--", "precip": 0, "icon": "☀️"}
             if p['isDaytime']:
-                data[d]['high'] = f"{p['temperature']}°"
-                data[d]['full_desc'] = p['shortForecast']
-                prob = p.get('probabilityOfPrecipitation', {}).get('value', 0)
-                data[d]['precip'] = prob if prob else 0
-                desc = p['shortForecast'].lower()
+                data[d]['high'] = f"{p['temperature']}°"; prob = p.get('probabilityOfPrecipitation', {}).get('value', 0)
+                data[d]['precip'] = prob if prob else 0; desc = p['shortForecast'].lower()
                 if 'snow' in desc: data[d]['icon'] = "❄️"
-                elif 'thunder' in desc or 't-storm' in desc: data[d]['icon'] = "⚡"
+                elif 'thunder' in desc: data[d]['icon'] = "⚡"
                 elif 'rain' in desc or 'showers' in desc: data[d]['icon'] = "💧"
-                elif 'cloud' in desc: data[d]['icon'] = "☁️"
                 else: data[d]['icon'] = "☀️"
-            else:
-                data[d]['low'] = f"{p['temperature']}°"
+            else: data[d]['low'] = f"{p['temperature']}°"
         return data
     except: return None
 
 def main():
+    # --- LOAD COUNTDOWNS ---
+    countdowns = []
+    try:
+        cd_res = requests.get(CD_URL)
+        if cd_res.status_code == 200:
+            for line in cd_res.text.strip().split('\n'):
+                if '|' in line:
+                    name, d_str = line.split('|')
+                    target = datetime.strptime(d_str.strip(), '%Y-%m-%d').date()
+                    diff = (target - date.today()).days
+                    if diff >= 0: countdowns.append((name, diff))
+    except: pass
+
+    # --- DISPLAY COUNTDOWNS ---
+    if countdowns:
+        cols = st.columns(len(countdowns))
+        for i, (name, days) in enumerate(countdowns):
+            with cols[i]:
+                st.markdown(f"""
+                <div class="countdown-card">
+                    <div style="font-size: 0.8rem; color: #555;">{name}</div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #ff4b4b;">{days} Days</div>
+                </div>
+                """, unsafe_allow_html=True)
+        st.write("")
+
+    # --- LOAD CALENDAR & WEATHER ---
+    weather = get_weather()
     res = requests.get(ICS_URL)
     cal = Calendar.from_ical(res.content) if res.status_code == 200 else None
-    weather = get_weather()
-    
     today = date.today()
     days = [today + timedelta(days=i) for i in range(7)]
     daily_events = {d: [] for d in days}
@@ -84,17 +89,10 @@ def main():
             d = start.date() if isinstance(start, datetime) else start
             if d in daily_events:
                 summary = str(ev.get('summary'))
-                # Pull location if it exists
-                location = str(ev.get('location', ''))
                 emoji = summary[-1] if len(summary) > 0 else "📅"
-                daily_events[d].append({
-                    "summary": summary, 
-                    "emoji": emoji, 
-                    "location": location,
-                    "time": start.strftime("%-I:%M %p") if isinstance(start, datetime) else "All Day"
-                })
+                daily_events[d].append({"summary": summary, "emoji": emoji, "time": start.strftime("%-I:%M %p") if isinstance(start, datetime) else "All Day"})
 
-    # --- 1. WEEKLY SUMMARY ---
+    # --- WEEKLY SUMMARY ---
     st.subheader("Weekly Summary")
     summary_cols = st.columns(7)
     for i, d in enumerate(days):
@@ -106,36 +104,23 @@ def main():
                 st.markdown(f"**{d.strftime('%a')}**")
                 st.markdown(f'<p class="emoji-row">{emojis if emojis else "✨"}</p>', unsafe_allow_html=True)
                 st.markdown(f"**{w['high']}** / {w['low']}")
-                precip_text = f" {w['precip']}%" if w['precip'] > 0 else ""
-                st.markdown(f'<p class="weather-sub">{w["icon"]}{precip_text}</p>', unsafe_allow_html=True)
+                st.markdown(f'<p class="weather-sub">{w["icon"]} {str(w["precip"])+"%" if w["precip"] > 0 else ""}</p>', unsafe_allow_html=True)
 
     st.divider()
-
-    # --- 2. DETAILED VIEW ---
-    st.subheader("Daily Details")
+    # --- DETAILS ---
     for d in days:
-        with st.container():
-            col_a, col_b = st.columns([1, 4])
-            with col_a:
-                st.markdown(f"### {d.strftime('%a')}")
-                st.caption(d.strftime('%b %d'))
-            with col_b:
-                events = sorted(daily_events[d], key=lambda x: (x['time'] != "All Day", x['time']))
-                if not events:
-                    st.write("✨ *No scheduled events*")
-                else:
-                    for ev in events:
-                        with st.container(border=True):
-                            st.markdown(f"**{ev['time']}** — {ev['summary']}")
-                            # Display location if available
-                            if ev['location'] and ev['location'].strip():
-                                st.markdown(f'<p class="location-text">📍 {ev["location"]}</p>', unsafe_allow_html=True)
-                
-                d_key = d.strftime('%Y-%m-%d')
-                if weather and d_key in weather:
-                    w = weather[d_key]
-                    st.caption(f"🌤️ {w['icon']} {w.get('full_desc', 'Forecast active')}")
-            st.divider()
+        col_a, col_b = st.columns([1, 4])
+        with col_a:
+            st.markdown(f"### {d.strftime('%a')}")
+            st.caption(d.strftime('%b %d'))
+        with col_b:
+            events = sorted(daily_events[d], key=lambda x: (x['time'] != "All Day", x['time']))
+            if not events: st.write("✨ *No scheduled events*")
+            else:
+                for ev in events:
+                    with st.container(border=True):
+                        st.markdown(f"**{ev['time']}** — {ev['summary']}")
+        st.divider()
 
 if __name__ == "__main__":
     main()
