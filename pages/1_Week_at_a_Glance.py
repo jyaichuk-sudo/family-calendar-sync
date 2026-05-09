@@ -68,7 +68,6 @@ def main():
             w = weather.get(day_str, {"high": "--", "low": "--"}) if weather else {"high": "--", "low": "--"}
             has_events = "🟢" if daily_events[day] else ""
             
-            # Create a stylized summary box
             with st.container(border=True):
                 st.markdown(f"**{day.strftime('%a')}** {has_events}")
                 st.markdown(f"**{w['high']}** / {w['low']}")
@@ -80,11 +79,9 @@ def main():
 
     for i, day in enumerate(days_to_show):
         with detail_cols[i]:
-            # 1. DATE HEADER
             st.markdown(f"### {day.strftime('%a')}")
             st.caption(day.strftime('%b %d'))
             
-            # 2. EVENTS SECTION
             events = sorted(daily_events[day], key=lambda x: (x['time'] != "All Day", x['time']))
             if not events:
                 st.write("✨ *Clear day*")
@@ -96,11 +93,10 @@ def main():
             
             st.write("") 
 
-            # 3. WEATHER SECTION
             day_str = day.strftime('%Y-%m-%d')
             if weather and day_str in weather:
                 w = weather[day_str]
-                with st.expander("🌤️ Forecast", expanded=False): # Closed by default to keep clean
+                with st.expander("🌤️ Forecast", expanded=False):
                     st.write(f"**{w['high']}** / {w['low']}")
                     st.caption(f"{w['desc']}")
             else:
@@ -108,3 +104,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
