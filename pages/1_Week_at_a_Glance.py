@@ -55,30 +55,37 @@ st.markdown("""
 @st.cache_data(ttl=3600)
 def get_weather():
     try:
+        # 1. Get the hourly forecast URL
         p_res = requests.get(f"https://api.weather.gov/points/{LAT},{LON}").json()
-        f_res = requests.get(p_res['properties']['forecast']).json()
-        data = {}
-        for p in f_res['properties']['periods']:
-            d = p['startTime'][:10]
-            if d not in data: 
-                data[d] = {"high": "--", "low": "--", "precip": 0, "icon": "☀️", "full_desc": ""}
+        h_url = p_res['properties']['forecastHourly']
+        h_res = requests.get(h_url).json()
+        
+        # 2. Store data indexed by "YYYY-MM-DD HH:00"
+        hourly_data = {}
+        for p in h_res['properties']['periods']:
+            # The API gives ISO format: 2026-05-09T18:00:00-04:00
+            # We simplify to "2026-05-09 18" for easy matching
+            timestamp = p['startTime'][:13].replace('T', ' ')
+            prob = p.get('probabilityOfPrecipitation', {}).get('value', 0)
             
-            if p['isDaytime']:
-                data[d]['high'] = f"{p['temperature']}°"
-                data[d]['full_desc'] = p['shortForecast']
-                prob = p.get('probabilityOfPrecipitation', {}).get('value', 0)
-                data[d]['precip'] = prob if prob else 0
-                
-                desc = p['shortForecast'].lower()
-                if 'snow' in desc: data[d]['icon'] = "❄️"
-                elif 'thunder' in desc or 't-storm' in desc: data[d]['icon'] = "⚡"
-                elif 'rain' in desc or 'showers' in desc: data[d]['icon'] = "💧"
-                elif 'cloud' in desc: data[d]['icon'] = "☁️"
-                else: data[d]['icon'] = "☀️"
-            else:
-                data[d]['low'] = f"{p['temperature']}°"
-        return data
-    except: return None
+            # Map description to icons
+            desc = p['shortForecast'].lower()
+            if 'snow' in desc: icon = "❄️"
+            elif 'thunder' in desc or 't-storm' in desc: icon = "⚡"
+            elif 'rain' in desc or 'showers' in desc: icon = "💧"
+            elif 'cloud' in desc: icon = "☁️"
+            else: icon = "☀️"
+
+            hourly_data[timestamp] = {
+                "temp": f"{p['temperature']}°",
+                "precip": f"{prob}%" if prob and prob > 0 else "",
+                "icon": icon,
+                "desc": p['shortForecast']
+            }
+        return hourly_data
+    except Exception as e:
+        st.error(f"Weather Error: {e}")
+        return {}
 
 def main():
     st.title("🗓️ Family Week at a Glance")
@@ -150,6 +157,7 @@ def main():
                     "summary": summary, 
                     "emoji": emoji, 
                     "location": loc,
+                    "dt_obj": start,
                     # Display the newly converted local time
                     "time": start.strftime("%-I:%M %p") if isinstance(start, datetime) else "All Day"
                 })
@@ -181,21 +189,28 @@ def main():
                 st.markdown(f"### {d.strftime('%a')}")
                 st.caption(d.strftime('%b %d'))
             with col_b:
-                events = sorted(daily_events[d], key=lambda x: (x['time'] != "All Day", x['time']))
-                if not events:
-                    st.write("✨ *No scheduled events*")
-                else:
-                    for ev in events:
-                        with st.container(border=True):
-                            st.markdown(f"**{ev['time']}** — {ev['summary']}")
-                            if ev.get('location'):
-                                st.markdown(f'<p style="font-size:0.85rem; color:#666; margin-top:2px;">📍 {ev["location"]}</p>', unsafe_allow_html=True)
-                
-                # Weather detail footer
-                d_key = d.strftime('%Y-%m-%d')
-                if weather and d_key in weather:
-                    w = weather[d_key]
-                    st.caption(f"🌤️ {w['icon']} {w.get('full_desc', 'Forecast active')}")
+for ev in events:
+    with st.container(border=True):
+        # 1. Create the lookup key for this event's hour
+        # If it's 2:30 PM on May 9, we look for "2026-05-09 14"
+        weather_info = ""
+        if ev['time'] != "All Day":
+            # We need the original start object we saved earlier
+            # Let's assume you're using the 'start' datetime object from earlier logic
+            # You'll want to add 'dt_obj': start to your daily_events list in the loop above
+            event_hour_key = ev['dt_obj'].strftime('%Y-%m-%d %H')
+            
+            if event_hour_key in weather:
+                w = weather[event_hour_key]
+                weather_info = f" | {w['icon']} {w['temp']}"
+                if w['precip']:
+                    weather_info += f" ({w['precip']} 💧)"
+
+        # 2. Display the event with the weather snippet
+        st.markdown(f"**{ev['time']}** — {ev['summary']}{weather_info}")
+        
+        if ev.get('location') and ev.get('location') != 'None':
+            st.markdown(f'<p style="font-size:0.85rem; color:#666; margin-top:2px;">📍 {ev["location"]}</p>', unsafe_allow_html=True)
             st.divider()
 
 if __name__ == "__main__":
