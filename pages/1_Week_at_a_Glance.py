@@ -3,6 +3,7 @@ import requests
 from icalendar import Calendar
 from datetime import datetime, timedelta, date
 import time
+import pytz
 
 # --- INITIAL SETUP ---
 st.set_page_config(page_title="Week at a Glance", page_icon="🗓️", layout="wide")
@@ -122,18 +123,34 @@ def main():
     days = [today + timedelta(days=i) for i in range(7)]
     daily_events = {d: [] for d in days}
 
+    # Define your local timezone
+    local_tz = pytz.timezone("America/New_York")
+
     if cal:
         for ev in cal.walk('VEVENT'):
             start = ev.get('dtstart').dt
+            
+            # 1. TIMEZONE CONVERSION LOGIC
+            if isinstance(start, datetime):
+                # If the time is in UTC (has a 'Z' or offset), convert to NY time
+                if start.tzinfo is not None:
+                    start = start.astimezone(local_tz)
+                else:
+                    # If the time is "floating" (no TZ), assume it's already local
+                    start = local_tz.localize(start)
+            
+            # 2. ASSIGN TO DAY
             d = start.date() if isinstance(start, datetime) else start
             if d in daily_events:
                 summary = str(ev.get('summary'))
                 loc = str(ev.get('location', ''))
                 emoji = summary[-1] if len(summary) > 0 else "📅"
+                
                 daily_events[d].append({
                     "summary": summary, 
                     "emoji": emoji, 
                     "location": loc,
+                    # Display the newly converted local time
                     "time": start.strftime("%-I:%M %p") if isinstance(start, datetime) else "All Day"
                 })
 
