@@ -5,6 +5,22 @@ from datetime import datetime, timedelta, date
 
 st.set_page_config(page_title="Week at a Glance", page_icon="🗓️", layout="wide")
 
+# --- CSS TO FORCE HORIZONTAL SUMMARY ON MOBILE ---
+st.markdown("""
+    <style>
+    /* This targets the first set of columns (the summary) */
+    [data-testid="stHorizontalBlock"]:first-of-type {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+    }
+    [data-testid="stHorizontalBlock"]:first-of-type > div {
+        min-width: 100px !important; /* Ensures boxes don't get too squished */
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 # --- CONFIG ---
 ICS_URL = "https://jyaichuk-sudo.github.io/family-calendar-sync/family_master.ics"
 LAT = "42.1034"
@@ -69,8 +85,9 @@ def main():
             has_events = "🟢" if daily_events[day] else ""
             
             with st.container(border=True):
+                # Using smaller text for the summary to fit better on mobile
                 st.markdown(f"**{day.strftime('%a')}** {has_events}")
-                st.markdown(f"**{w['high']}** / {w['low']}")
+                st.markdown(f"<small>{w['high']}/{w['low']}</small>", unsafe_allow_html=True)
     
     st.divider()
 
