@@ -6,33 +6,26 @@ def merge():
     master_cal.add('prodid', '-//Family Sync//EN')
     master_cal.add('version', '2.0')
 
-    # Now reading from your new text file
-    try:
-        with open("calendars.txt", "r") as f:
-            lines = f.readlines()
-    except FileNotFoundError:
-        print("Error: calendars.txt not found.")
-        return
+    with open("calendars.txt", "r") as f:
+        lines = f.readlines()
 
     for line in lines:
-        line = line.strip()
-        if not line or ':' not in line: continue
-        
-        name, url = line.split(':', 1)
-        url = url.replace('webcal://', 'https://').strip()
+        if ':' not in line: continue
+        meta, url = line.strip().split(':', 1)
+        # Parse Name and Emoji
+        name, emoji = meta.split('|', 1) if '|' in meta else (meta, "📅")
         
         try:
-            res = requests.get(url)
+            res = requests.get(url.replace('webcal://', 'https://'))
             if res.status_code == 200:
                 cal = Calendar.from_ical(res.content)
                 for event in cal.walk('VEVENT'):
-                    # Keeps the source name in brackets
                     summary = event.get('summary', 'No Title')
-                    event['summary'] = f"{summary} ({name})"
+                    # Tag the event with the emoji for the UI to find
+                    event['summary'] = f"{summary} ({name}) {emoji}"
                     master_cal.add_component(event)
-                print(f"✅ Synced {name}")
         except Exception as e:
-            print(f"❌ Error {name}: {e}")
+            print(f"Error {name}: {e}")
 
     with open("family_master.ics", "wb") as f:
         f.write(master_cal.to_ical())
