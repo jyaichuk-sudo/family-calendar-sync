@@ -17,9 +17,16 @@ st.markdown("""
     [data-testid="stHorizontalBlock"]:first-of-type > div {
         min-width: 100px !important; 
     }
+    .emoji-row {
+        font-size: 1.2rem;
+        margin-top: -5px;
+        margin-bottom: 5px;
+        min-height: 1.5rem;
+    }
     .weather-sub {
         font-size: 0.8rem;
         font-weight: bold;
+        color: #555;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -47,7 +54,6 @@ def get_weather():
                 prob = p.get('probabilityOfPrecipitation', {}).get('value', 0)
                 data[d]['precip'] = prob if prob else 0
                 
-                # Simple Icon Mapping
                 desc = p['shortForecast'].lower()
                 if 'snow' in desc: data[d]['icon'] = "❄️"
                 elif 'thunder' in desc or 't-storm' in desc: data[d]['icon'] = "⚡"
@@ -74,6 +80,7 @@ def main():
             d = start.date() if isinstance(start, datetime) else start
             if d in daily_events:
                 summary = str(ev.get('summary'))
+                # Pull the emoji from the end of the summary
                 emoji = summary[-1] if len(summary) > 0 else "📅"
                 daily_events[d].append({"summary": summary, "emoji": emoji, "time": start.strftime("%-I:%M %p") if isinstance(start, datetime) else "All Day"})
 
@@ -84,17 +91,18 @@ def main():
         with summary_cols[i]:
             d_key = d.strftime('%Y-%m-%d')
             w = weather.get(d_key, {"high": "--", "low": "--", "precip": 0, "icon": "☀️"})
-            emojis = "".join(list(set([e['emoji'] for e in daily_events[d]])))
+            
+            # Extract unique emojis
+            emojis = "".join(list(dict.fromkeys([e['emoji'] for e in daily_events[d]])))
             
             with st.container(border=True):
-                st.markdown(f"**{d.strftime('%a')}** {emojis}")
+                st.markdown(f"**{d.strftime('%a')}**")
+                # Emojis on their own line with custom CSS class
+                st.markdown(f'<p class="emoji-row">{emojis if emojis else "✨"}</p>', unsafe_allow_html=True)
                 st.markdown(f"**{w['high']}** / {w['low']}")
                 
-                # Compact weather icons
-                if w['precip'] > 0:
-                    st.markdown(f'<p class="weather-sub">{w["icon"]} {w["precip"]}%</p>', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<p class="weather-sub">{w["icon"]}</p>', unsafe_allow_html=True)
+                precip_text = f" {w['precip']}%" if w['precip'] > 0 else ""
+                st.markdown(f'<p class="weather-sub">{w["icon"]}{precip_text}</p>', unsafe_allow_html=True)
 
     st.divider()
 
@@ -116,7 +124,8 @@ def main():
                 w = weather[d_key]
                 with st.expander("🌤️ Details", expanded=False):
                     st.write(f"**{w['high']}** / {w['low']}")
-                    st.caption(p['shortForecast'] if 'p' in locals() else "Forecast available")
+                    st.caption(f"{w['icon']} Forecast active")
 
 if __name__ == "__main__":
     main()
+    
